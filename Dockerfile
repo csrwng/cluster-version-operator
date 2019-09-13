@@ -7,4 +7,5 @@ FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base
 COPY --from=builder /go/src/github.com/openshift/cluster-version-operator/_output/linux/amd64/cluster-version-operator /usr/bin/
 COPY install /manifests
 COPY bootstrap /bootstrap
+COPY bootstrap-hosted /bootstrap-hosted
 ENTRYPOINT ["/usr/bin/cluster-version-operator"]

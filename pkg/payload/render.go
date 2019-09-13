@@ -21,6 +21,8 @@ func Render(outputDir, releaseImage string) error {
 		oManifestsDir = filepath.Join(outputDir, "manifests")
 		bootstrapDir  = "/bootstrap"
 		oBootstrapDir = filepath.Join(outputDir, "bootstrap")
+		hostedDir     = "/bootstrap-hosted"
+		oHostedDir    = filepath.Join(outputDir, "bootstrap-hosted")
 
 		renderConfig = manifestRenderConfig{ReleaseImage: releaseImage}
 	)
@@ -29,20 +31,28 @@ func Render(outputDir, releaseImage string) error {
 		idir      string
 		odir      string
 		skipFiles sets.String
-	}{{
-		idir: manifestsDir,
-		odir: oManifestsDir,
-		skipFiles: sets.NewString(
-			"image-references",
-			"0000_90_cluster-version-operator_00_prometheusrole.yaml",
-			"0000_90_cluster-version-operator_01_prometheusrolebinding.yaml",
-			"0000_90_cluster-version-operator_02_servicemonitor.yaml",
-		),
-	}, {
-		idir:      bootstrapDir,
-		odir:      oBootstrapDir,
-		skipFiles: sets.NewString(),
-	}}
+	}{
+		{
+			idir: manifestsDir,
+			odir: oManifestsDir,
+			skipFiles: sets.NewString(
+				"image-references",
+				"0000_90_cluster-version-operator_00_prometheusrole.yaml",
+				"0000_90_cluster-version-operator_01_prometheusrolebinding.yaml",
+				"0000_90_cluster-version-operator_02_servicemonitor.yaml",
+			),
+		},
+		{
+			idir:      bootstrapDir,
+			odir:      oBootstrapDir,
+			skipFiles: sets.NewString(),
+		},
+		{
+			idir:      hostedDir,
+			odir:      oHostedDir,
+			skipFiles: sets.NewString(),
+		},
+	}
 	var errs []error
 	for _, task := range tasks {
 		if err := renderDir(renderConfig, task.idir, task.odir, task.skipFiles); err != nil {
