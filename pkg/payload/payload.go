@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/pkg/errors"
@@ -102,8 +103,8 @@ type Update struct {
 	Manifests    []lib.Manifest
 }
 
-func LoadUpdate(dir, releaseImage string) (*Update, error) {
-	payload, tasks, err := loadUpdatePayloadMetadata(dir, releaseImage)
+func LoadUpdate(dir, releaseImage string, skipOperators ...string) (*Update, error) {
+	payload, tasks, err := loadUpdatePayloadMetadata(dir, releaseImage, skipOperators)
 	if err != nil {
 		return nil, err
 	}
@@ -129,6 +130,9 @@ func LoadUpdate(dir, releaseImage string) (*Update, error) {
 
 			p := filepath.Join(task.idir, file.Name())
 			if task.skipFiles.Has(p) {
+				continue
+			}
+			if task.skipOperators.Match(file.Name()) {
 				continue
 			}
 
@@ -200,13 +204,28 @@ func ValidateDirectory(dir string) error {
 	return nil
 }
 
-type payloadTasks struct {
-	idir       string
-	preprocess func([]byte) ([]byte, error)
-	skipFiles  sets.String
+type operatorFilePatterns []string
+
+func (p operatorFilePatterns) Match(name string) bool {
+	if p == nil || len(p) == 0 {
+		return false
+	}
+	for _, op := range p {
+		if regexp.MustCompile(fmt.Sprintf(".{4}_.{2}_%s_.*", op)).MatchString(name) {
+			return true
+		}
+	}
+	return false
 }
 
-func loadUpdatePayloadMetadata(dir, releaseImage string) (*Update, []payloadTasks, error) {
+type payloadTasks struct {
+	idir          string
+	preprocess    func([]byte) ([]byte, error)
+	skipFiles     sets.String
+	skipOperators operatorFilePatterns
+}
+
+func loadUpdatePayloadMetadata(dir, releaseImage string, skipOperators []string) (*Update, []payloadTasks, error) {
 	klog.V(4).Infof("Loading updatepayload from %q", dir)
 	if err := ValidateDirectory(dir); err != nil {
 		return nil, nil, err
@@ -236,9 +255,10 @@ func loadUpdatePayloadMetadata(dir, releaseImage string) (*Update, []payloadTask
 		preprocess: func(ib []byte) ([]byte, error) { return renderManifest(mrc, ib) },
 		skipFiles:  sets.NewString(),
 	}, {
-		idir:       releaseDir,
-		preprocess: nil,
-		skipFiles:  sets.NewString(cjf, irf),
+		idir:          releaseDir,
+		preprocess:    nil,
+		skipFiles:     sets.NewString(cjf, irf),
+		skipOperators: operatorFilePatterns(skipOperators),
 	}}
 	return &Update{ImageRef: imageRef, ReleaseImage: releaseImage, ReleaseVersion: imageRef.Name}, tasks, nil
 }

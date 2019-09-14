@@ -30,5 +30,6 @@ func init() {
 	cmd.PersistentFlags().BoolVar(&opts.EnableAutoUpdate, "enable-auto-update", opts.EnableAutoUpdate, "Enables the autoupdate controller.")
 	cmd.PersistentFlags().BoolVar(&opts.EnableDefaultClusterVersion, "enable-default-cluster-version", opts.EnableDefaultClusterVersion, "Allows the operator to create a ClusterVersion object if one does not already exist.")
 	cmd.PersistentFlags().StringVar(&opts.ReleaseImage, "release-image", opts.ReleaseImage, "The Openshift release image url.")
+	cmd.PersistentFlags().StringSliceVar(&opts.IgnoreOperators, "ignore-operators", opts.IgnoreOperators, "Operators to ignore when applying manifests to target cluster")
 	rootCmd.AddCommand(cmd)
 }

@@ -197,8 +197,8 @@ func New(
 // InitializeFromPayload retrieves the payload contents and verifies the initial state, then configures the
 // controller that loads and applies content to the cluster. It returns an error if the payload appears to
 // be in error rather than continuing.
-func (optr *Operator) InitializeFromPayload(restConfig *rest.Config, burstRestConfig *rest.Config) error {
-	update, err := payload.LoadUpdate(optr.defaultPayloadDir(), optr.releaseImage)
+func (optr *Operator) InitializeFromPayload(restConfig *rest.Config, burstRestConfig *rest.Config, skipOperators []string) error {
+	update, err := payload.LoadUpdate(optr.defaultPayloadDir(), optr.releaseImage, skipOperators...)
 	if err != nil {
 		return fmt.Errorf("the local release contents are invalid - no current version can be determined from disk: %v", err)
 	}

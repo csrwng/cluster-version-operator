@@ -64,6 +64,9 @@ type Options struct {
 	PayloadOverride string
 	EnableMetrics   bool
 	ResyncInterval  time.Duration
+
+	// Operator manifests to ignore
+	IgnoreOperators []string
 }
 
 func defaultEnv(name, defaultValue string) string {
