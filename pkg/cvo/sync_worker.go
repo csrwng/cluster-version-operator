@@ -126,11 +126,11 @@ func (w SyncWorkerStatus) DeepCopy() *SyncWorkerStatus {
 //     syncOnce() returns nil -> Reconciling
 //
 type SyncWorker struct {
-	backoff     wait.Backoff
-	retriever   PayloadRetriever
-	builder     payload.ResourceBuilder
-	preconditions  precondition.List
-	reconciling bool
+	backoff       wait.Backoff
+	retriever     PayloadRetriever
+	builder       payload.ResourceBuilder
+	preconditions precondition.List
+	reconciling   bool
 
 	// minimumReconcileInterval is the minimum time between reconcile attempts, and is
 	// used to define the maximum backoff interval when syncOnce() returns an error.
@@ -148,11 +148,16 @@ type SyncWorker struct {
 
 	// updated by the run method only
 	payload *payload.Update
+
+	// exclude is an identifier used to determine which
+	// manifests should be excluded based on an annotation
+	// of the form exclude.release.openshift.io/<identifier>=true
+	exclude string
 }
 
 // NewSyncWorker initializes a ConfigSyncWorker that will retrieve payloads to disk, apply them via builder
 // to a server, and obey limits about how often to reconcile or retry on errors.
-func NewSyncWorker(retriever PayloadRetriever, builder payload.ResourceBuilder, reconcileInterval time.Duration, backoff wait.Backoff) *SyncWorker {
+func NewSyncWorker(retriever PayloadRetriever, builder payload.ResourceBuilder, reconcileInterval time.Duration, backoff wait.Backoff, exclude string) *SyncWorker {
 	return &SyncWorker{
 		retriever: retriever,
 		builder:   builder,
@@ -165,14 +170,16 @@ func NewSyncWorker(retriever PayloadRetriever, builder payload.ResourceBuilder, 
 		// Status() or use the result of calling Update() instead because the channel can be out of date
 		// if the reader is not fast enough.
 		report: make(chan SyncWorkerStatus, 500),
+
+		exclude: exclude,
 	}
 }
 
 // NewSyncWorkerWithPreconditions initializes a ConfigSyncWorker that will retrieve payloads to disk, apply them via builder
 // to a server, and obey limits about how often to reconcile or retry on errors.
 // It allows providing preconditions for loading payload.
-func NewSyncWorkerWithPreconditions(retriever PayloadRetriever, builder payload.ResourceBuilder, preconditions precondition.List, reconcileInterval time.Duration, backoff wait.Backoff) *SyncWorker {
-	worker := NewSyncWorker(retriever, builder, reconcileInterval, backoff)
+func NewSyncWorkerWithPreconditions(retriever PayloadRetriever, builder payload.ResourceBuilder, preconditions precondition.List, reconcileInterval time.Duration, backoff wait.Backoff, exclude string) *SyncWorker {
+	worker := NewSyncWorker(retriever, builder, reconcileInterval, backoff, exclude)
 	worker.preconditions = preconditions
 	return worker
 }
@@ -620,6 +627,11 @@ func (w *SyncWorker) apply(ctx context.Context, payloadUpdate *payload.Update, w
 				continue
 			}
 
+			if shouldExclude(w.exclude, task.Manifest) {
+				klog.V(4).Infof("Skipping %s because of exclude annotation", task)
+				continue
+			}
+
 			if err := task.Run(ctx, version, w.builder, work.State); err != nil {
 				return err
 			}
@@ -916,6 +928,19 @@ func getOverrideForManifest(overrides []configv1.ComponentOverride, manifest *li
 		}
 	}
 	return configv1.ComponentOverride{}, false
+}
+
+// shouldExclude returns true if the exclude identifier matches an exclude annotation on the manifest.
+func shouldExclude(excludeIdentifier string, manifest *lib.Manifest) bool {
+	if len(excludeIdentifier) == 0 {
+		return false
+	}
+	annotations := manifest.Object().GetAnnotations()
+	if annotations == nil {
+		return false
+	}
+	excludeAnnotation := fmt.Sprintf("exclude.release.openshift.io/%s", excludeIdentifier)
+	return annotations[excludeAnnotation] == "true"
 }
 
 // ownerKind contains the schema.GroupVersionKind for type that owns objects managed by CVO.
